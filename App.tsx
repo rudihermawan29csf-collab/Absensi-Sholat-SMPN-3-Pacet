@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Users, QrCode, Trophy, LogOut, User, Home, Loader2, RefreshCw } from 'lucide-react';
+import { Shield, Users, QrCode, Trophy, LogOut, User, Home, Loader2, RefreshCw } from 'lucide-center';
+import { Shield as ShieldIcon, Users as UsersIcon, QrCode as QrCodeIcon, Trophy as TrophyIcon, LogOut as LogOutIcon, User as UserIcon, Home as HomeIcon, Loader2 as LoaderIcon, RefreshCw as RefreshCwIcon } from 'lucide-react';
 import ScannerTab from './components/ScannerTab';
 import StudentList from './components/StudentList';
 import Reports from './components/Reports';
@@ -21,24 +22,13 @@ function App() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Sinkronisasi Full (Siswa + Absensi)
-  const syncFullData = async () => {
-    setIsSyncing(true);
-    try {
-      const [studentData, attendanceData] = await Promise.all([
-        getStudents(),
-        getAttendance()
-      ]);
-      setStudents(studentData);
-      setRecords(attendanceData);
-    } catch (error) {
-      console.error("Sync error:", error);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
+  // Inisialisasi dari Local Storage (Sangat Cepat)
   useEffect(() => {
+    const localStuds = localStorage.getItem(STORAGE_KEYS.STUDENTS);
+    const localRecs = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
+    if (localStuds) setStudents(JSON.parse(localStuds));
+    if (localRecs) setRecords(JSON.parse(localRecs));
+
     const sessionAuth = localStorage.getItem(STORAGE_KEYS.AUTH);
     if (sessionAuth) {
       try {
@@ -54,10 +44,35 @@ function App() {
         localStorage.removeItem(STORAGE_KEYS.AUTH);
       }
     }
+    
+    // Auto sync sekali saat startup di background
     syncFullData();
   }, []);
 
-  const handleRecordUpdate = () => syncFullData();
+  const syncFullData = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const [studentData, attendanceData] = await Promise.all([
+        getStudents(),
+        getAttendance()
+      ]);
+      setStudents(studentData);
+      setRecords(attendanceData);
+    } catch (error) {
+      console.error("Sync error:", error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Fungsi sakti: Update state instan dari Local Storage
+  const handleRecordUpdate = () => {
+    const localRecs = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
+    if (localRecs) {
+        setRecords(JSON.parse(localRecs));
+    }
+  };
 
   const handleLogin = (username: string, role: UserRole, studentData?: Student) => {
     const authData = { username, role, studentData };
@@ -111,14 +126,14 @@ function App() {
                   disabled={isSyncing}
                   className="flex items-center gap-2 text-[10px] font-bold tracking-widest uppercase border border-cyan-500/30 px-2 py-1 rounded bg-cyan-950/30 text-cyan-400 hover:bg-cyan-500/20 transition-all"
                >
-                 {isSyncing ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+                 {isSyncing ? <RefreshCwIcon size={10} className="animate-spin" /> : <RefreshCwIcon size={10} />}
                  {isSyncing ? 'SYNCING...' : 'REFRESH DATABASE'}
                </button>
             </div>
           </div>
 
           <button onClick={handleLogout} className="p-2 text-red-400 bg-red-900/20 rounded-lg border border-red-500/20 active:scale-90 transition-transform">
-              <LogOut size={20} />
+              <LogOutIcon size={20} />
           </button>
         </div>
       </header>
@@ -139,24 +154,24 @@ function App() {
           <div className="max-w-xl mx-auto flex justify-center items-end pb-4 gap-4 md:gap-8">
              <button onClick={() => setActiveTab('dashboard')} className={`group flex flex-col items-center transition-all w-16 ${activeTab === 'dashboard' ? '-translate-y-2 scale-110' : 'opacity-70'}`}>
                 <div className={`w-12 h-12 flex items-center justify-center rounded-xl transform rotate-45 border-2 ${activeTab === 'dashboard' ? 'bg-slate-800 border-amber-400' : 'bg-slate-900 border-slate-700'}`}>
-                  <Home size={22} className={`transform -rotate-45 ${activeTab === 'dashboard' ? 'text-amber-400' : 'text-slate-400'}`} />
+                  <HomeIcon size={22} className={`transform -rotate-45 ${activeTab === 'dashboard' ? 'text-amber-400' : 'text-slate-400'}`} />
                 </div>
              </button>
              <button onClick={() => setActiveTab('scan')} className={`group flex flex-col items-center transition-all w-16 ${activeTab === 'scan' ? '-translate-y-2 scale-110' : 'opacity-70'}`}>
                 <div className={`w-12 h-12 flex items-center justify-center rounded-xl transform rotate-45 border-2 ${activeTab === 'scan' ? 'bg-slate-800 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.4)]' : 'bg-slate-900 border-slate-700'}`}>
-                  <QrCode size={22} className={`transform -rotate-45 ${activeTab === 'scan' ? 'text-cyan-400' : 'text-slate-400'}`} />
+                  <QrCodeIcon size={22} className={`transform -rotate-45 ${activeTab === 'scan' ? 'text-cyan-400' : 'text-slate-400'}`} />
                 </div>
              </button>
              {userRole === 'ADMIN' && (
                <button onClick={() => setActiveTab('students')} className={`group flex flex-col items-center transition-all w-16 ${activeTab === 'students' ? '-translate-y-2 scale-110' : 'opacity-70'}`}>
                   <div className={`w-12 h-12 flex items-center justify-center rounded-xl transform rotate-45 border-2 ${activeTab === 'students' ? 'bg-slate-800 border-amber-400' : 'bg-slate-900 border-slate-700'}`}>
-                    <Users size={22} className={`transform -rotate-45 ${activeTab === 'students' ? 'text-amber-400' : 'text-slate-400'}`} />
+                    <UsersIcon size={22} className={`transform -rotate-45 ${activeTab === 'students' ? 'text-amber-400' : 'text-slate-400'}`} />
                   </div>
                </button>
              )}
              <button onClick={() => setActiveTab('reports')} className={`group flex flex-col items-center transition-all w-16 ${activeTab === 'reports' ? '-translate-y-2 scale-110' : 'opacity-70'}`}>
                 <div className={`w-12 h-12 flex items-center justify-center rounded-xl transform rotate-45 border-2 ${activeTab === 'reports' ? 'bg-slate-800 border-amber-400' : 'bg-slate-900 border-slate-700'}`}>
-                  <Trophy size={22} className={`transform -rotate-45 ${activeTab === 'reports' ? 'text-amber-400' : 'text-slate-400'}`} />
+                  <TrophyIcon size={22} className={`transform -rotate-45 ${activeTab === 'reports' ? 'text-amber-400' : 'text-slate-400'}`} />
                 </div>
              </button>
           </div>

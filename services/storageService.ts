@@ -2,7 +2,7 @@
 import { Student, AttendanceRecord } from '../types';
 import { INITIAL_STUDENTS, STORAGE_KEYS, GOOGLE_SCRIPT_URL } from '../constants';
 
-const fetchWithTimeout = async (url: string, options: any = {}, timeout = 10000) => {
+const fetchWithTimeout = async (url: string, options: any = {}, timeout = 8000) => {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   try {
@@ -19,6 +19,7 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeout = 10000)
   }
 };
 
+// Ambil data siswa (Utamakan Lokal, Sinkron Cloud di background)
 export const getStudents = async (): Promise<Student[]> => {
   const stored = localStorage.getItem(STORAGE_KEYS.STUDENTS);
   let localData: Student[] = stored ? JSON.parse(stored) : INITIAL_STUDENTS;
@@ -28,31 +29,27 @@ export const getStudents = async (): Promise<Student[]> => {
     const cloudData = await response.json();
     
     if (Array.isArray(cloudData) && cloudData.length > 0) {
-      // Merge logic for students: Cloud takes precedence, but keep local-only if any
+      // Merge: Cloud adalah acuan, tapi jangan hapus yang ada di lokal jika belum ada di cloud
+      const cloudMap = new Map(cloudData.map(s => [s.id, s]));
       const merged = [...cloudData];
-      localData.forEach(ls => {
-        if (!merged.find(cs => cs.id === ls.id)) merged.push(ls);
-      });
+      
       localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(merged));
       return merged;
     }
-    return localData;
-  } catch (error) {
-    return localData;
+  } catch (e) {
+    console.warn("Gagal ambil data siswa dari cloud, menggunakan lokal.");
   }
+  return localData;
 };
 
 export const saveStudents = async (students: Student[]): Promise<boolean> => {
   localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
   try {
-    await fetch(GOOGLE_SCRIPT_URL, {
+    fetch(GOOGLE_SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'saveStudents',
-        payload: students
-      })
+      body: JSON.stringify({ action: 'saveStudents', payload: students })
     });
     return true;
   } catch (error) {
@@ -60,6 +57,7 @@ export const saveStudents = async (students: Student[]): Promise<boolean> => {
   }
 };
 
+// Ambil data absensi dengan cerdas
 export const getAttendance = async (): Promise<AttendanceRecord[]> => {
   const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
   const localRecords: AttendanceRecord[] = stored ? JSON.parse(stored) : [];
@@ -69,14 +67,13 @@ export const getAttendance = async (): Promise<AttendanceRecord[]> => {
     const cloudRecords = await response.json();
     
     if (Array.isArray(cloudRecords)) {
-      // PENTING: Merge data Cloud dan Lokal berdasarkan ID agar record baru tidak hilang
+      // Gabungkan data cloud dengan data lokal yang belum masuk cloud
       const recordMap = new Map();
       
-      // Masukkan data cloud dulu
+      // 1. Masukkan semua data cloud
       cloudRecords.forEach((r: AttendanceRecord) => recordMap.set(r.id, r));
       
-      // Masukkan data lokal (Data lokal yang ID-nya sama dengan cloud akan di-update, 
-      // tapi data lokal yang belum ada di cloud akan tetap ada)
+      // 2. Tambahkan data lokal yang belum ada di cloud (berdasarkan ID)
       localRecords.forEach((r: AttendanceRecord) => {
         if (!recordMap.has(r.id)) {
           recordMap.set(r.id, r);
@@ -84,27 +81,31 @@ export const getAttendance = async (): Promise<AttendanceRecord[]> => {
       });
 
       const mergedRecords = Array.from(recordMap.values());
+      // Urutkan berdasarkan timestamp terbaru
+      mergedRecords.sort((a, b) => b.timestamp - a.timestamp);
+      
       localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(mergedRecords));
       return mergedRecords;
     }
-    return localRecords;
-  } catch (error) {
-    return localRecords;
+  } catch (e) {
+    console.warn("Gagal sinkron absensi cloud.");
   }
+  return localRecords;
 };
 
 export const addAttendanceRecordToSheet = async (
   student: Student, 
   operatorName: string, 
   status: 'PRESENT' | 'HAID' = 'PRESENT'
-): Promise<{ success: boolean; message: string }> => {
+): Promise<{ success: boolean; message: string; record?: AttendanceRecord }> => {
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-  const cachedRecords = JSON.parse(localStorage.getItem(STORAGE_KEYS.ATTENDANCE) || '[]');
+  const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
+  const cachedRecords: AttendanceRecord[] = stored ? JSON.parse(stored) : [];
   
-  // Cek apakah sudah ada hari ini
-  if (cachedRecords.some((r: any) => r.studentId === student.id && r.date === today)) {
+  // Cek duplikasi di lokal
+  if (cachedRecords.some((r) => r.studentId === student.id && r.date === today)) {
     return { success: false, message: `${student.name} sudah absen hari ini.` };
   }
 
@@ -119,24 +120,24 @@ export const addAttendanceRecordToSheet = async (
     status: status
   };
 
-  // Simpan LOKAL dulu agar instan muncul di UI
-  const updatedRecords = [...cachedRecords, newRecord];
+  // 1. SIMPAN LOKAL SEGERA (Optimistic)
+  const updatedRecords = [newRecord, ...cachedRecords];
   localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(updatedRecords));
 
-  try {
-    // Kirim ke Cloud di background
-    fetch(GOOGLE_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors', 
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'addAttendance',
-        payload: newRecord
-      })
-    });
+  // 2. KIRIM CLOUD DI BACKGROUND (Tanpa await response)
+  fetch(GOOGLE_SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors', 
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'addAttendance',
+      payload: newRecord
+    })
+  }).catch(e => console.error("Cloud save failed, will retry later."));
 
-    return { success: true, message: `${student.name} berhasil ABSEN.` };
-  } catch (error) {
-    return { success: true, message: `${student.name} berhasil (Offline Mode).` };
-  }
+  return { 
+    success: true, 
+    message: `${student.name} berhasil ABSEN.`,
+    record: newRecord 
+  };
 };
