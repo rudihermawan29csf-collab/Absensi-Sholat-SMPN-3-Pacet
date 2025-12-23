@@ -2,11 +2,15 @@
 import { Student, AttendanceRecord } from '../types';
 import { INITIAL_STUDENTS, STORAGE_KEYS, GOOGLE_SCRIPT_URL } from '../constants';
 
-const fetchWithTimeout = async (url: string, options: any = {}, timeout = 8000) => {
+const fetchWithTimeout = async (url: string, options: any = {}, timeout = 10000) => {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
+    const response = await fetch(url, { 
+      ...options, 
+      signal: controller.signal,
+      redirect: 'follow' 
+    });
     clearTimeout(id);
     return response;
   } catch (error) {
@@ -15,27 +19,35 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeout = 8000) 
   }
 };
 
-// AMBIL SISWA DARI CLOUD
 export const getStudents = async (): Promise<Student[]> => {
+  // 1. Cek Cache Lokal Terlebih Dahulu (Data yang paling baru diinput user)
+  const stored = localStorage.getItem(STORAGE_KEYS.STUDENTS);
+  let localData: Student[] = stored ? JSON.parse(stored) : INITIAL_STUDENTS;
+
   try {
     const response = await fetchWithTimeout(`${GOOGLE_SCRIPT_URL}?action=getStudents`);
-    const data = await response.json();
-    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(data));
-    return data;
+    const cloudData = await response.json();
+    
+    // 2. Jika Cloud punya data dan lebih banyak/baru, gunakan Cloud
+    if (Array.isArray(cloudData) && cloudData.length > 0) {
+      localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(cloudData));
+      return cloudData;
+    }
+    
+    return localData;
   } catch (error) {
-    console.warn("Gagal ambil siswa dari cloud, gunakan lokal.");
-    const stored = localStorage.getItem(STORAGE_KEYS.STUDENTS);
-    return stored ? JSON.parse(stored) : INITIAL_STUDENTS;
+    console.warn("Cloud unreachable, using local data.");
+    return localData;
   }
 };
 
-// SIMPAN SISWA KE CLOUD
 export const saveStudents = async (students: Student[]): Promise<boolean> => {
   localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
   try {
-    await fetch(GOOGLE_SCRIPT_URL, {
+    // Gunakan POST untuk menyimpan ke Google Sheets
+    const response = await fetch(GOOGLE_SCRIPT_URL, {
       method: 'POST',
-      mode: 'no-cors',
+      mode: 'no-cors', // Penting untuk Apps Script POST
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'saveStudents',
@@ -49,20 +61,24 @@ export const saveStudents = async (students: Student[]): Promise<boolean> => {
   }
 };
 
-// AMBIL ABSENSI DARI CLOUD
 export const getAttendance = async (): Promise<AttendanceRecord[]> => {
+  const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
+  const localRecords = stored ? JSON.parse(stored) : [];
+
   try {
-    const response = await fetchWithTimeout(GOOGLE_SCRIPT_URL);
-    const data = await response.json();
-    localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(data));
-    return data;
+    const response = await fetchWithTimeout(`${GOOGLE_SCRIPT_URL}?action=getAttendance`);
+    const cloudRecords = await response.json();
+    
+    if (Array.isArray(cloudRecords)) {
+      localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(cloudRecords));
+      return cloudRecords;
+    }
+    return localRecords;
   } catch (error) {
-    const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
-    return stored ? JSON.parse(stored) : [];
+    return localRecords;
   }
 };
 
-// SIMPAN ABSENSI KE CLOUD
 export const addAttendanceRecordToSheet = async (
   student: Student, 
   operatorName: string, 
@@ -102,8 +118,9 @@ export const addAttendanceRecordToSheet = async (
     localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(updatedRecords));
     return { success: true, message: `${student.name} berhasil ABSEN (Cloud Sync)` };
   } catch (error) {
+    // Tetap simpan lokal jika gagal cloud
     const updatedRecords = [...cachedRecords, newRecord];
     localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(updatedRecords));
-    return { success: true, message: `${student.name} berhasil (Lokal)` };
+    return { success: true, message: `${student.name} berhasil (Lokal/Offline)` };
   }
 };

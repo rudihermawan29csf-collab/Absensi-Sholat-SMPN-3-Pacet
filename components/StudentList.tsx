@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Student } from '../types';
-import { UserPlus, Trash2, Users, QrCode, Sword, Scroll, Save, Download, Upload, FileSpreadsheet, Phone, Edit, X, Loader2 } from 'lucide-react';
+import { UserPlus, Trash2, Users, QrCode, Save, Upload, Edit, X, Loader2, Phone, User as UserIcon } from 'lucide-react';
 import { saveStudents } from '../services/storageService';
 import CardGenerator from './CardGenerator';
 import * as XLSX from 'xlsx';
@@ -16,8 +16,9 @@ const StudentList: React.FC<StudentListProps> = ({ students, setStudents }) => {
   const [showCardGenerator, setShowCardGenerator] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  const [newStudent, setNewStudent] = useState<Partial<Student>>({ className: 'IX A', gender: 'L', parentPhone: '' });
-  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [newStudent, setNewStudent] = useState<Partial<Student>>({ className: 'IX A', gender: 'L', parentPhone: '', name: '', id: '' });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Student | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -40,13 +41,23 @@ const StudentList: React.FC<StudentListProps> = ({ students, setStudents }) => {
     setNewStudent({ className: 'IX A', gender: 'L', name: '', id: '', parentPhone: '' });
   };
 
+  const startEditing = (student: Student) => {
+    setEditingId(student.id);
+    setEditForm({ ...student });
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditForm(null);
+  };
+
   const handleUpdateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingStudent || !editingStudent.name || !editingStudent.id || isSaving) return;
+    if (!editForm || !editForm.name || !editForm.id || isSaving) return;
 
-    const finalList = students.map(s => s.id === editingStudent.id ? editingStudent : s);
+    const finalList = students.map(s => s.id === editForm.id ? editForm : s);
     await performSync(finalList);
-    setEditingStudent(null);
+    cancelEditing();
   };
 
   const handleDelete = async (id: string) => {
@@ -81,7 +92,7 @@ const StudentList: React.FC<StudentListProps> = ({ students, setStudents }) => {
               name: String(nameRaw).toUpperCase().trim(),
               className: String(row['Kelas'] || 'IX A').trim(),
               gender: (String(row['Gender'] || 'L').toUpperCase().startsWith('P')) ? 'P' : 'L',
-              parentPhone: String(row['No WA Ortu'] || '').replace(/\D/g, '')
+              parentPhone: String(row['No WA Ortu'] || row['WA'] || '').replace(/\D/g, '')
             });
           }
         });
@@ -95,7 +106,7 @@ const StudentList: React.FC<StudentListProps> = ({ students, setStudents }) => {
             });
             mergedStudents.sort((a, b) => a.className.localeCompare(b.className) || a.name.localeCompare(b.name));
             await performSync(mergedStudents);
-            alert(`Impor Sukses! Data disinkronkan ke Cloud.`);
+            alert(`Impor Sukses! ${newStudents.length} data disinkronkan ke Cloud.`);
         }
       } catch (error) {
         alert("Gagal membaca file Excel.");
@@ -116,7 +127,7 @@ const StudentList: React.FC<StudentListProps> = ({ students, setStudents }) => {
             </div>
           )}
           <h2 className="text-xl font-bold text-amber-500 flex items-center gap-3 font-gaming">
-            <Scroll className="text-cyan-400" />
+            <Users className="text-cyan-400" />
             HERO ROSTER <span className="text-slate-500 text-sm font-sans font-normal ml-2">({students.length})</span>
           </h2>
           
@@ -129,110 +140,137 @@ const StudentList: React.FC<StudentListProps> = ({ students, setStudents }) => {
                 <QrCode size={16} /> Cards
              </button>
              <button onClick={() => setIsAdding(!isAdding)} className="flex-1 sm:flex-none bg-amber-600 text-slate-900 px-4 py-2 rounded-lg text-xs font-bold hover:bg-amber-500 transition-all flex items-center justify-center gap-2 uppercase tracking-wide">
-                <UserPlus size={16} /> {isAdding ? 'Cancel' : 'Add Hero'}
+                {isAdding ? <X size={16} /> : <UserPlus size={16} />} {isAdding ? 'Cancel' : 'Add Hero'}
              </button>
           </div>
         </div>
 
         {isAdding && (
           <div className="bg-slate-900/90 p-6 rounded-xl border border-amber-500/30 animate-fade-in shadow-2xl">
-            <h3 className="font-bold mb-6 text-amber-400 font-gaming text-lg border-b border-white/10 pb-2">Registrasi Baru</h3>
+            <h3 className="font-bold mb-6 text-amber-400 font-gaming text-lg border-b border-white/10 pb-2">Registrasi Hero Baru</h3>
             <form onSubmit={handleAddStudent} className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-cyan-400 uppercase tracking-widest">NIS / ID</label>
-                <input type="text" required className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 outline-none" value={newStudent.id || ''} onChange={e => setNewStudent({...newStudent, id: e.target.value})} />
+                <input type="text" required className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 outline-none focus:border-amber-500" value={newStudent.id || ''} onChange={e => setNewStudent({...newStudent, id: e.target.value})} />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-cyan-400 uppercase tracking-widest">Nama Lengkap</label>
-                <input type="text" required className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 outline-none" value={newStudent.name || ''} onChange={e => setNewStudent({...newStudent, name: e.target.value.toUpperCase()})} />
+                <input type="text" required className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 outline-none focus:border-amber-500" value={newStudent.name || ''} onChange={e => setNewStudent({...newStudent, name: e.target.value.toUpperCase()})} />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-cyan-400 uppercase tracking-widest">Kelas</label>
-                <input type="text" required className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 outline-none" value={newStudent.className || ''} onChange={e => setNewStudent({...newStudent, className: e.target.value})} />
+                <input type="text" required className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 outline-none focus:border-amber-500" value={newStudent.className || ''} onChange={e => setNewStudent({...newStudent, className: e.target.value})} />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-cyan-400 uppercase tracking-widest">Gender</label>
-                <select className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 outline-none" value={newStudent.gender || ''} onChange={e => setNewStudent({...newStudent, gender: e.target.value as 'L'|'P'})}>
+                <select className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 outline-none focus:border-amber-500" value={newStudent.gender || ''} onChange={e => setNewStudent({...newStudent, gender: e.target.value as 'L'|'P'})}>
                   <option value="L">Laki-laki</option>
                   <option value="P">Perempuan</option>
                 </select>
               </div>
+              <div className="md:col-span-2 space-y-1">
+                <label className="text-xs font-medium text-green-400 uppercase tracking-widest">No WA Orang Tua (Contoh: 08123...)</label>
+                <input type="text" className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 outline-none focus:border-green-500" value={newStudent.parentPhone || ''} onChange={e => setNewStudent({...newStudent, parentPhone: e.target.value})} />
+              </div>
               <div className="md:col-span-2 mt-4">
                 <button type="submit" disabled={isSaving} className="w-full bg-cyan-600 text-white py-3 rounded-lg hover:bg-cyan-500 font-bold uppercase tracking-widest shadow-lg flex items-center justify-center gap-2">
-                  {isSaving ? <Loader2 className="animate-spin" /> : <Save size={18} />} Simpan ke Cloud
+                  {isSaving ? <Loader2 className="animate-spin" /> : <Save size={18} />} Simpan Hero ke Cloud
                 </button>
               </div>
             </form>
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-3">
-          {students.map((student) => (
-            <div key={student.id} className="group relative bg-slate-800/40 border border-slate-700 hover:border-amber-500/50 rounded-xl p-4 transition-all duration-300">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center border-2 ${student.gender === 'L' ? 'bg-blue-950 border-blue-600 text-blue-400' : 'bg-pink-950 border-pink-600 text-pink-400'}`}>
-                    <Users size={20} />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-200 group-hover:text-amber-400">{student.name}</h4>
-                    <div className="flex gap-3 text-xs text-slate-500 mt-1 font-mono">
-                      <span className="text-cyan-500">{student.id}</span>
-                      <span>{student.className}</span>
+        <div className="grid grid-cols-1 gap-4">
+          {students.map((student) => {
+            const isEditing = editingId === student.id;
+            
+            if (isEditing && editForm) {
+              return (
+                <div key={student.id} className="bg-slate-900 border-2 border-amber-500 rounded-xl p-6 shadow-2xl animate-fade-in">
+                  <form onSubmit={handleUpdateStudent} className="space-y-4">
+                    <div className="flex justify-between items-center border-b border-white/10 pb-2 mb-4">
+                      <h3 className="text-amber-400 font-bold font-gaming">EDITING: {student.name}</h3>
+                      <button type="button" onClick={cancelEditing} className="text-slate-500 hover:text-white"><X size={20} /></button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">NIS / ID (Fixed)</label>
+                          <input disabled className="w-full p-2.5 bg-slate-950/50 border border-slate-800 rounded-lg text-slate-500 font-mono" value={editForm.id} />
+                       </div>
+                       <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-cyan-400 uppercase">Nama Lengkap</label>
+                          <input type="text" required className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 focus:border-amber-500" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value.toUpperCase()})} />
+                       </div>
+                       <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-cyan-400 uppercase">Kelas</label>
+                          <input type="text" required className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 focus:border-amber-500" value={editForm.className} onChange={e => setEditForm({...editForm, className: e.target.value})} />
+                       </div>
+                       <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-cyan-400 uppercase">Gender</label>
+                          <select className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 focus:border-amber-500" value={editForm.gender || ''} onChange={e => setEditForm({...editForm, gender: e.target.value as 'L'|'P'})}>
+                              <option value="L">Laki-laki</option>
+                              <option value="P">Perempuan</option>
+                          </select>
+                       </div>
+                       <div className="md:col-span-2 space-y-1">
+                          <label className="text-[10px] font-bold text-green-400 uppercase">No WA Orang Tua</label>
+                          <input type="text" className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 focus:border-green-500" value={editForm.parentPhone || ''} onChange={e => setEditForm({...editForm, parentPhone: e.target.value})} />
+                       </div>
+                    </div>
+                    
+                    <div className="flex gap-3 pt-2">
+                      <button type="button" onClick={cancelEditing} className="flex-1 bg-slate-800 text-slate-300 py-3 rounded-lg font-bold">Batal</button>
+                      <button type="submit" disabled={isSaving} className="flex-2 bg-amber-600 text-slate-900 py-3 rounded-lg font-bold shadow-lg flex items-center justify-center gap-2 px-8">
+                        {isSaving ? <Loader2 className="animate-spin" /> : <Save size={18} />} Update Data
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              );
+            }
+
+            return (
+              <div key={student.id} className="group relative bg-slate-800/40 border border-slate-700 hover:border-amber-500/50 rounded-xl p-4 transition-all duration-300">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center border-2 shrink-0 ${student.gender === 'L' ? 'bg-blue-950 border-blue-600 text-blue-400 shadow-[0_0_10px_rgba(37,99,235,0.2)]' : 'bg-pink-950 border-pink-600 text-pink-400 shadow-[0_0_10px_rgba(219,39,119,0.2)]'}`}>
+                      {student.gender === 'L' ? <UserIcon size={24} /> : <UserIcon size={24} />}
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="font-bold text-slate-200 group-hover:text-amber-400 text-lg leading-tight truncate">{student.name}</h4>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 mt-1 font-mono uppercase">
+                        <span className="text-cyan-500 font-bold">ID: {student.id}</span>
+                        <span>KELAS: {student.className}</span>
+                        {student.parentPhone && (
+                          <span className="text-green-500 flex items-center gap-1">
+                            <Phone size={10} /> {student.parentPhone}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={() => setEditingStudent(student)} className="p-2 text-slate-600 hover:text-amber-400"><Edit size={18} /></button>
-                    <button onClick={() => handleDelete(student.id)} className="p-2 text-slate-600 hover:text-red-400"><Trash2 size={18} /></button>
+                  <div className="flex gap-2 self-end sm:self-center">
+                      <button 
+                        onClick={() => startEditing(student)} 
+                        className="flex items-center gap-2 bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-amber-500 hover:bg-amber-500/10 hover:border-amber-500 transition-all"
+                      >
+                        <Edit size={14} /> EDIT
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(student.id)} 
+                        className="p-2 text-slate-600 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
-
-      {editingStudent && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-            <div className="bg-slate-900 border border-amber-500 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden">
-                <div className="flex justify-between items-center p-4 border-b border-white/10 bg-slate-950">
-                    <h3 className="text-lg font-bold text-amber-400 font-gaming">EDIT HERO DATA</h3>
-                    <button onClick={() => setEditingStudent(null)} className="text-slate-400 hover:text-white"><X size={24} /></button>
-                </div>
-                <div className="p-6">
-                    <form onSubmit={handleUpdateStudent} className="space-y-5">
-                        <div className="space-y-1">
-                            <label className="text-xs font-medium text-slate-400 uppercase tracking-widest">NIS / ID</label>
-                            <input disabled className="w-full p-3 bg-slate-950/50 border border-slate-800 rounded-lg text-slate-500 font-mono" value={editingStudent.id} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs font-medium text-cyan-400 uppercase tracking-widest">Nama Lengkap</label>
-                            <input type="text" required className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-slate-200" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value.toUpperCase()})} />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <label className="text-xs font-medium text-cyan-400 uppercase tracking-widest">Kelas</label>
-                                <input type="text" required className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-slate-200" value={editingStudent.className} onChange={e => setEditingStudent({...editingStudent, className: e.target.value})} />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-xs font-medium text-cyan-400 uppercase tracking-widest">Gender</label>
-                                <select className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-slate-200" value={editingStudent.gender || ''} onChange={e => setEditingStudent({...editingStudent, gender: e.target.value as 'L'|'P'})}>
-                                    <option value="L">Laki-laki</option>
-                                    <option value="P">Perempuan</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div className="pt-4 flex gap-3">
-                            <button type="button" onClick={() => setEditingStudent(null)} className="flex-1 bg-slate-800 text-slate-300 py-3 rounded-lg font-bold">Batal</button>
-                            <button type="submit" disabled={isSaving} className="flex-1 bg-amber-600 text-slate-900 py-3 rounded-lg font-bold shadow-lg flex items-center justify-center gap-2">
-                                {isSaving ? <Loader2 className="animate-spin" /> : <Save size={18} />} Update Cloud
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-      )}
       {showCardGenerator && <CardGenerator students={students} onClose={() => setShowCardGenerator(false)} />}
     </>
   );

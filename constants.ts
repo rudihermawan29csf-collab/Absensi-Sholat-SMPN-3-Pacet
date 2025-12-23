@@ -1,13 +1,23 @@
 
 import { Student } from './types';
 
-// GANTI URL INI DENGAN URL WEB APP DARI GOOGLE APPS SCRIPT ANDA
+// URL Google Apps Script Anda
 export const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwtcLk4tHst7HkGIv36oOasY6ollRDqp9AMTfKkua-5vOId6VO7c3TCsNyD2a4MNJFtOw/exec";
 
+// SILAKAN TEMPELKAN KEMBALI DAFTAR LENGKAP SISWA ANDA DI SINI
+// Jika Anda memiliki file Excel, Anda juga bisa menggunakan tombol "IMPORT" di menu "HEROES"
 export const INITIAL_STUDENTS: Student[] = [
-  // Data ini sekarang hanya sebagai fallback jika internet mati
   { id: '1129', className: 'IX A', name: 'ABEL AULIA PASA RAMADANI', gender: 'P' },
-  { id: '1132', className: 'IX A', name: 'ADITYA FIRMANSYAH', gender: 'L', parentPhone: '628987654321' },
+  { id: '1132', className: 'IX A', name: 'ADITYA FIRMANSYAH', gender: 'L' },
+  { id: '1133', className: 'IX A', name: 'AHMAD DANI', gender: 'L' },
+  { id: '1134', className: 'IX B', name: 'ALYA NUR AZIZAH', gender: 'P' },
+  { id: '1135', className: 'IX B', name: 'BINTANG RAMADHAN', gender: 'L' },
+  { id: '1136', className: 'IX C', name: 'CHAIRUL ANAM', gender: 'L' },
+  { id: '1137', className: 'IX C', name: 'DEWI SARTIKA', gender: 'P' },
+  { id: '1138', className: 'IX D', name: 'EKO PRASETYO', gender: 'L' },
+  { id: '1139', className: 'IX D', name: 'FITRIANI', gender: 'P' },
+  { id: '1140', className: 'IX E', name: 'GALIH RAKASWI', gender: 'L' }
+  // ... Tambahkan data siswa lainnya di sini jika ada
 ];
 
 export const TEACHERS = [

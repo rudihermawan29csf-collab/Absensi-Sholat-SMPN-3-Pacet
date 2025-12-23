@@ -10,8 +10,8 @@
     <style>
       body {
         font-family: 'Inter', sans-serif;
-        background-color: #0f172a; /* Slate 900 */
-        color: #e2e8f0; /* Slate 200 */
+        background-color: #0f172a;
+        color: #e2e8f0;
       }
       
       h1, h2, h3, h4, .font-gaming {
@@ -26,25 +26,10 @@
           scrollbar-width: none;
       }
 
-      .clip-diagonal {
-        clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%);
-      }
-      
       @media print {
-        @page {
-          size: A4;
-          margin: 1cm;
-        }
-        body {
-          background-color: white;
-          color: black;
-        }
-        .no-print {
-          display: none !important;
-        }
-        .print-only {
-          display: block !important;
-        }
+        @page { size: A4; margin: 1cm; }
+        body { background-color: white; color: black; }
+        .no-print { display: none !important; }
       }
 
       @keyframes fade-in {
@@ -58,27 +43,26 @@
   <script type="importmap">
 {
   "imports": {
-    "vite": "https://esm.sh/vite@^7.3.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "jspdf": "https://esm.sh/jspdf@^3.0.4",
-    "recharts": "https://esm.sh/recharts@^3.6.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "xlsx": "https://esm.sh/xlsx@^0.18.5",
-    "date-fns/": "https://esm.sh/date-fns@^4.1.0/",
-    "date-fns": "https://esm.sh/date-fns@^4.1.0",
-    "react-qr-code": "https://esm.sh/react-qr-code@^2.0.18",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
     "react-qr-reader": "https://esm.sh/react-qr-reader@^3.0.0-beta-1",
-    "html2canvas": "https://esm.sh/html2canvas@^1.4.1"
+    "xlsx": "https://esm.sh/xlsx@^0.18.5",
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "date-fns": "https://esm.sh/date-fns@^4.1.0",
+    "date-fns/": "https://esm.sh/date-fns@^4.1.0/",
+    "html2canvas": "https://esm.sh/html2canvas@^1.4.1",
+    "jspdf": "https://esm.sh/jspdf@^3.0.4",
+    "react-qr-code": "https://esm.sh/react-qr-code@^2.0.18",
+    "vite": "https://esm.sh/vite@^7.3.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
 </head>
   <body>
     <div id="root"></div>
-    <!-- Entry point utama untuk menjalankan aplikasi React -->
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>
