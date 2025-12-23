@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Users, QrCode, Trophy, LogOut, User, Home, Loader2, RefreshCw } from 'lucide-center';
+// Fix: Removed incorrect import from 'lucide-center' which doesn't exist.
 import { Shield as ShieldIcon, Users as UsersIcon, QrCode as QrCodeIcon, Trophy as TrophyIcon, LogOut as LogOutIcon, User as UserIcon, Home as HomeIcon, Loader2 as LoaderIcon, RefreshCw as RefreshCwIcon } from 'lucide-react';
 import ScannerTab from './components/ScannerTab';
 import StudentList from './components/StudentList';
@@ -145,7 +145,8 @@ function App() {
             <ScannerTab students={students} records={records} onRecordUpdate={handleRecordUpdate} currentUser={currentUser} />
           )}
           {activeTab === 'students' && userRole === 'ADMIN' && <StudentList students={students} setStudents={setStudents} />}
-          {activeTab === 'reports' && <Reports records={records} students={students} viewOnlyStudent={parentStudentData} />}
+          {/* Fix: Added missing onRecordUpdate prop to Reports component */}
+          {activeTab === 'reports' && <Reports records={records} students={students} onRecordUpdate={handleRecordUpdate} viewOnlyStudent={parentStudentData} />}
         </div>
       </main>
 

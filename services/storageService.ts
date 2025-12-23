@@ -19,7 +19,6 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeout = 8000) 
   }
 };
 
-// Ambil data siswa (Utamakan Lokal, Sinkron Cloud di background)
 export const getStudents = async (): Promise<Student[]> => {
   const stored = localStorage.getItem(STORAGE_KEYS.STUDENTS);
   let localData: Student[] = stored ? JSON.parse(stored) : INITIAL_STUDENTS;
@@ -29,12 +28,8 @@ export const getStudents = async (): Promise<Student[]> => {
     const cloudData = await response.json();
     
     if (Array.isArray(cloudData) && cloudData.length > 0) {
-      // Merge: Cloud adalah acuan, tapi jangan hapus yang ada di lokal jika belum ada di cloud
-      const cloudMap = new Map(cloudData.map(s => [s.id, s]));
-      const merged = [...cloudData];
-      
-      localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(merged));
-      return merged;
+      localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(cloudData));
+      return cloudData;
     }
   } catch (e) {
     console.warn("Gagal ambil data siswa dari cloud, menggunakan lokal.");
@@ -57,7 +52,6 @@ export const saveStudents = async (students: Student[]): Promise<boolean> => {
   }
 };
 
-// Ambil data absensi dengan cerdas
 export const getAttendance = async (): Promise<AttendanceRecord[]> => {
   const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
   const localRecords: AttendanceRecord[] = stored ? JSON.parse(stored) : [];
@@ -67,21 +61,13 @@ export const getAttendance = async (): Promise<AttendanceRecord[]> => {
     const cloudRecords = await response.json();
     
     if (Array.isArray(cloudRecords)) {
-      // Gabungkan data cloud dengan data lokal yang belum masuk cloud
       const recordMap = new Map();
-      
-      // 1. Masukkan semua data cloud
       cloudRecords.forEach((r: AttendanceRecord) => recordMap.set(r.id, r));
-      
-      // 2. Tambahkan data lokal yang belum ada di cloud (berdasarkan ID)
       localRecords.forEach((r: AttendanceRecord) => {
-        if (!recordMap.has(r.id)) {
-          recordMap.set(r.id, r);
-        }
+        if (!recordMap.has(r.id)) recordMap.set(r.id, r);
       });
 
       const mergedRecords = Array.from(recordMap.values());
-      // Urutkan berdasarkan timestamp terbaru
       mergedRecords.sort((a, b) => b.timestamp - a.timestamp);
       
       localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(mergedRecords));
@@ -91,6 +77,49 @@ export const getAttendance = async (): Promise<AttendanceRecord[]> => {
     console.warn("Gagal sinkron absensi cloud.");
   }
   return localRecords;
+};
+
+export const deleteAttendanceRecord = async (id: string): Promise<boolean> => {
+  const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
+  if (!stored) return false;
+  
+  const records: AttendanceRecord[] = JSON.parse(stored);
+  const filtered = records.filter(r => r.id !== id);
+  localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(filtered));
+
+  try {
+    fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify({ action: 'deleteAttendance', payload: { id } })
+    });
+    return true;
+  } catch (e) {
+    return true; // Optimistic
+  }
+};
+
+export const updateAttendanceStatus = async (id: string, newStatus: 'PRESENT' | 'HAID'): Promise<boolean> => {
+  const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
+  if (!stored) return false;
+  
+  const records: AttendanceRecord[] = JSON.parse(stored);
+  const index = records.findIndex(r => r.id === id);
+  if (index === -1) return false;
+
+  records[index].status = newStatus;
+  localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(records));
+
+  try {
+    fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify({ action: 'updateAttendance', payload: { id, status: newStatus } })
+    });
+    return true;
+  } catch (e) {
+    return true;
+  }
 };
 
 export const addAttendanceRecordToSheet = async (
@@ -104,7 +133,6 @@ export const addAttendanceRecordToSheet = async (
   const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
   const cachedRecords: AttendanceRecord[] = stored ? JSON.parse(stored) : [];
   
-  // Cek duplikasi di lokal
   if (cachedRecords.some((r) => r.studentId === student.id && r.date === today)) {
     return { success: false, message: `${student.name} sudah absen hari ini.` };
   }
@@ -120,11 +148,9 @@ export const addAttendanceRecordToSheet = async (
     status: status
   };
 
-  // 1. SIMPAN LOKAL SEGERA (Optimistic)
   const updatedRecords = [newRecord, ...cachedRecords];
   localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(updatedRecords));
 
-  // 2. KIRIM CLOUD DI BACKGROUND (Tanpa await response)
   fetch(GOOGLE_SCRIPT_URL, {
     method: 'POST',
     mode: 'no-cors', 
@@ -133,7 +159,7 @@ export const addAttendanceRecordToSheet = async (
       action: 'addAttendance',
       payload: newRecord
     })
-  }).catch(e => console.error("Cloud save failed, will retry later."));
+  });
 
   return { 
     success: true, 
