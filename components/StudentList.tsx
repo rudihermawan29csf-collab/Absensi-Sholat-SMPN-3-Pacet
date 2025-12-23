@@ -236,7 +236,7 @@ const StudentList: React.FC<StudentListProps> = ({ students, setStudents }) => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <div className={`w-14 h-14 rounded-xl flex items-center justify-center border-2 shrink-0 ${student.gender === 'L' ? 'bg-blue-950 border-blue-600 text-blue-400 shadow-[0_0_10px_rgba(37,99,235,0.2)]' : 'bg-pink-950 border-pink-600 text-pink-400 shadow-[0_0_10px_rgba(219,39,119,0.2)]'}`}>
-                      {student.gender === 'L' ? <UserIcon size={24} /> : <UserIcon size={24} />}
+                      <UserIcon size={24} />
                     </div>
                     <div className="min-w-0">
                       <h4 className="font-bold text-slate-200 group-hover:text-amber-400 text-lg leading-tight truncate">{student.name}</h4>

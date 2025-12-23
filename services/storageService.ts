@@ -20,7 +20,6 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeout = 10000)
 };
 
 export const getStudents = async (): Promise<Student[]> => {
-  // 1. Cek Cache Lokal Terlebih Dahulu (Data yang paling baru diinput user)
   const stored = localStorage.getItem(STORAGE_KEYS.STUDENTS);
   let localData: Student[] = stored ? JSON.parse(stored) : INITIAL_STUDENTS;
 
@@ -28,15 +27,17 @@ export const getStudents = async (): Promise<Student[]> => {
     const response = await fetchWithTimeout(`${GOOGLE_SCRIPT_URL}?action=getStudents`);
     const cloudData = await response.json();
     
-    // 2. Jika Cloud punya data dan lebih banyak/baru, gunakan Cloud
     if (Array.isArray(cloudData) && cloudData.length > 0) {
-      localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(cloudData));
-      return cloudData;
+      // Merge logic for students: Cloud takes precedence, but keep local-only if any
+      const merged = [...cloudData];
+      localData.forEach(ls => {
+        if (!merged.find(cs => cs.id === ls.id)) merged.push(ls);
+      });
+      localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(merged));
+      return merged;
     }
-    
     return localData;
   } catch (error) {
-    console.warn("Cloud unreachable, using local data.");
     return localData;
   }
 };
@@ -44,10 +45,9 @@ export const getStudents = async (): Promise<Student[]> => {
 export const saveStudents = async (students: Student[]): Promise<boolean> => {
   localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
   try {
-    // Gunakan POST untuk menyimpan ke Google Sheets
-    const response = await fetch(GOOGLE_SCRIPT_URL, {
+    await fetch(GOOGLE_SCRIPT_URL, {
       method: 'POST',
-      mode: 'no-cors', // Penting untuk Apps Script POST
+      mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'saveStudents',
@@ -56,22 +56,36 @@ export const saveStudents = async (students: Student[]): Promise<boolean> => {
     });
     return true;
   } catch (error) {
-    console.error("Gagal sinkron siswa ke cloud:", error);
     return false;
   }
 };
 
 export const getAttendance = async (): Promise<AttendanceRecord[]> => {
   const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
-  const localRecords = stored ? JSON.parse(stored) : [];
+  const localRecords: AttendanceRecord[] = stored ? JSON.parse(stored) : [];
 
   try {
     const response = await fetchWithTimeout(`${GOOGLE_SCRIPT_URL}?action=getAttendance`);
     const cloudRecords = await response.json();
     
     if (Array.isArray(cloudRecords)) {
-      localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(cloudRecords));
-      return cloudRecords;
+      // PENTING: Merge data Cloud dan Lokal berdasarkan ID agar record baru tidak hilang
+      const recordMap = new Map();
+      
+      // Masukkan data cloud dulu
+      cloudRecords.forEach((r: AttendanceRecord) => recordMap.set(r.id, r));
+      
+      // Masukkan data lokal (Data lokal yang ID-nya sama dengan cloud akan di-update, 
+      // tapi data lokal yang belum ada di cloud akan tetap ada)
+      localRecords.forEach((r: AttendanceRecord) => {
+        if (!recordMap.has(r.id)) {
+          recordMap.set(r.id, r);
+        }
+      });
+
+      const mergedRecords = Array.from(recordMap.values());
+      localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(mergedRecords));
+      return mergedRecords;
     }
     return localRecords;
   } catch (error) {
@@ -88,6 +102,8 @@ export const addAttendanceRecordToSheet = async (
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   const cachedRecords = JSON.parse(localStorage.getItem(STORAGE_KEYS.ATTENDANCE) || '[]');
+  
+  // Cek apakah sudah ada hari ini
   if (cachedRecords.some((r: any) => r.studentId === student.id && r.date === today)) {
     return { success: false, message: `${student.name} sudah absen hari ini.` };
   }
@@ -103,8 +119,13 @@ export const addAttendanceRecordToSheet = async (
     status: status
   };
 
+  // Simpan LOKAL dulu agar instan muncul di UI
+  const updatedRecords = [...cachedRecords, newRecord];
+  localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(updatedRecords));
+
   try {
-    await fetch(GOOGLE_SCRIPT_URL, {
+    // Kirim ke Cloud di background
+    fetch(GOOGLE_SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors', 
       headers: { 'Content-Type': 'application/json' },
@@ -114,13 +135,8 @@ export const addAttendanceRecordToSheet = async (
       })
     });
 
-    const updatedRecords = [...cachedRecords, newRecord];
-    localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(updatedRecords));
-    return { success: true, message: `${student.name} berhasil ABSEN (Cloud Sync)` };
+    return { success: true, message: `${student.name} berhasil ABSEN.` };
   } catch (error) {
-    // Tetap simpan lokal jika gagal cloud
-    const updatedRecords = [...cachedRecords, newRecord];
-    localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(updatedRecords));
-    return { success: true, message: `${student.name} berhasil (Lokal/Offline)` };
+    return { success: true, message: `${student.name} berhasil (Offline Mode).` };
   }
 };
