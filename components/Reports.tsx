@@ -477,11 +477,13 @@ const Reports: React.FC<ReportsProps> = ({ records, students, viewOnlyStudent })
         'Petugas': item.operator
     }));
 
-    // 3. Create Sheet with Data starting at row 7 (after headers)
-    const ws = XLSX.utils.json_to_sheet(tableData, { origin: 'A7' });
+    // 3. Create Sheet with Header Rows
+    // Fixed: XLSX.utils.json_to_sheet does not support 'origin' option.
+    // Use aoa_to_sheet for header then sheet_add_json for data.
+    const ws = XLSX.utils.aoa_to_sheet(headerRows);
     
-    // 4. Add Header Rows at the top
-    XLSX.utils.sheet_add_aoa(ws, headerRows, { origin: 'A1' });
+    // 4. Add table data starting at row 7 (A7)
+    XLSX.utils.sheet_add_json(ws, tableData, { origin: 'A7' });
 
     // 5. Create Workbook
     const wb = XLSX.utils.book_new();
