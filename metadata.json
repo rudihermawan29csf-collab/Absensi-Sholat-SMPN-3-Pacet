@@ -1,0 +1,7 @@
+{
+  "name": "Absensi Sholat SMPN 3 Pacet",
+  "description": "Aplikasi rekap absensi sholat Dhuhur dengan fitur scan barcode dan laporan berkala.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
